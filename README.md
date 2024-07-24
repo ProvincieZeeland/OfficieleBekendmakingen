@@ -19,6 +19,7 @@ pip install requests pandas geopandas shapely sqlalchemy geoalchemy2 configparse
 Het script leest configuratiegegevens uit een `config.ini` bestand. Het bestand moet de volgende structuur hebben:
 
 ```ini
+#Connectie gegevens van de PostGIS database
 [database]
 username = jouw_gebruikersnaam
 password = jouw_wachtwoord

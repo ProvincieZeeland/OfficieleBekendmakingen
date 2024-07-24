@@ -1,5 +1,5 @@
 
-# Script README
+# Bekendmakingen API uitvragen
 
 Dit script haalt records op van een API, verwerkt de geometrieën en schrijft de gegevens naar een PostGIS-database. Het is ontworpen om de database te vullen met geografische gegevens vanaf een startdatum. Vervolgens is er een tweede script dat de records bij blijft werken door de meest recente datum weg te gooien en alles vanaf die datum tot de huidige datum op te vragen en toe te voegen. Hieronder vindt je een gedetailleerde uitleg van de functionaliteit en het gebruik van het script.
 

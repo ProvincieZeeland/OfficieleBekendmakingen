@@ -3,16 +3,30 @@
 
 Dit script haalt records op van een API, verwerkt de geometrieën en schrijft de gegevens naar een PostGIS-database. Het is ontworpen om de database te vullen met geografische gegevens vanaf een startdatum. Vervolgens is er een tweede script dat de records bij blijft werken door de meest recente datum weg te gooien en alles vanaf die datum tot de huidige datum op te vragen en toe te voegen. Hieronder vindt je een gedetailleerde uitleg van de functionaliteit en het gebruik van het script.
 
-## Vereisten
+### Vereiste bibliotheken en versies
 
-- Python 3.x
-- Vereiste bibliotheken: `requests`, `xml.etree.ElementTree`, `datetime`, `time`, `pandas`, `geopandas`, `shapely`, `sqlalchemy`, `geoalchemy2`, `configparser`
-
-Installeer de vereiste bibliotheken met pip:
-
-```bash
-pip install requests pandas geopandas shapely sqlalchemy geoalchemy2 configparser
-```
+- `GeoAlchemy2==0.15.1.dist`
+- `SQLAlchemy==2.0.31.dist`
+- `certifi==2024.6.2.dist`
+- `charset_normalizer==3.3.2.dist`
+- `geopandas==1.0.0.dist`
+- `greenlet==3.0.3.dist`
+- `idna==3.7.dist`
+- `numpy==2.0.0.dist`
+- `packaging==24.1.dist`
+- `pandas==2.2.2.dist`
+- `pip==23.2.1.dist`
+- `psycopg2==2.9.9.dist`
+- `pyogrio==0.9.0.dist`
+- `pyproj==3.6.1.dist`
+- `python_dateutil==2.9.0.post0.dist`
+- `pytz==2024.1.dist`
+- `requests==2.32.3.dist`
+- `shapely==2.0.4.dist`
+- `six==1.16.0.dist`
+- `typing_extensions==4.12.2.dist`
+- `tzdata==2024.1.dist`
+- `urllib3==2.2.2.dist`
 
 ## Configuratie
 

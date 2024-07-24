@@ -1,10 +1,10 @@
 
-# Bekendmakingen API uitvragen
+# Bekendmakingen API uitvragen en wegschrijven
 
 Wat zijn bekendmakingen? Officiële bekendmakingen worden gepubliceerd op [officielebekendmakingen.nl](https://www.officielebekendmakingen.nl/) door de verschillende overheden. Officiële bekendmakingen bevatten publicaties van de overheid zoals wetten, besluiten en verordeningen. Onder officiële bekendmakingen wordt verstaan alle publicaties in het Staatsblad, de Staatscourant, het Tractatenblad, de Gemeentebladen, Provinciale bladen, Waterschapsbladen en Bladen gemeenschappelijke regeling. De gegevensverzameling met parlementaire documenten omvat publicaties van de Eerste en Tweede Kamer en de Verenigde Vergadering. Alle data is open en kan worden bevraagd door middel van een API, een handleiding daarvan is [hier](https://data.overheid.nl/sites/default/files/dataset/d0cca537-44ea-48cf-9880-fa21e1a7058f/resources/Handleiding%2BSRU%2B2.0.pdf) te vinden.
 
 
-Dit script haalt records op van een API, verwerkt de geometrieën en schrijft de gegevens naar een PostGIS-database. Het is ontworpen om de database te vullen met geografische gegevens vanaf een startdatum. Vervolgens is er een tweede script dat de records bij blijft werken door de meest recente datum weg te gooien en alles vanaf die datum tot de huidige datum op te vragen en toe te voegen. Hieronder vindt je een gedetailleerde uitleg van de functionaliteit en het gebruik van het script. 
+Dit script haalt records op van een API, verwerkt de geometrieën en schrijft de gegevens naar een PostGIS-database. Het is ontworpen om de database te vullen met geografische gegevens vanaf een startdatum en filteren op een geografisch gebied. Vervolgens is er een tweede script dat de records bij blijft werken door de meest recente datum weg te gooien en alles vanaf die datum tot de huidige datum op te vragen en toe te voegen. Hieronder vindt je een gedetailleerde uitleg van de functionaliteit en het gebruik van het script. 
 
 **Kanttekeningen** 
 1. Het script haalt eerste alle records op voordat er op de geometrie wordt gefilterd. Dit omdat de data af en toe ongestructureerd is en op een andere plek geregistreerd worden dan dat ze zich daadwerkelijk bevinden. Door eerst alles op te halen en vervolgens de opgehaalde geometriën te filteren duurt het script vele malen langer om te runnen maar wordt wel **alles** opgehaald binnen de aangegeven grenzen.

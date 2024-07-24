@@ -27,6 +27,10 @@ db_url = f'postgresql://{username}:{password}@{host}:{port}/{database_name}'
 
 geometry_bounds_wkt = config['api']['geometry_bounds']
 geometry_bounds = wkt.loads(geometry_bounds_wkt)
+start_datum_str = config['api']['start_datum']
+
+# Convert start_datum to datetime
+start_datum = datetime.strptime(start_datum_str, '%Y-%m-%d')
 
 # Constants
 API_ENDPOINT = "https://repository.overheid.nl/sru"
@@ -130,14 +134,6 @@ def extract_data(record):
             geo_data['gebiedsmarkering_type'] = geom_type
             geo_data['geometrieLabel'] = label.text if label is not None else None
 
-            # Fetch metadata URL and extract referentienummer
-            metadata_url = record.find('.//gzd:itemUrl[@manifestation="metadata"]', NAMESPACES)
-            if metadata_url is not None:
-                referentienummer = fetch_referentienummer(metadata_url.text)
-                geo_data['referentienummer'] = referentienummer
-            else:
-                geo_data['referentienummer'] = None
-
             record_data.append(geo_data)
     return record_data
 
@@ -152,8 +148,34 @@ def fetch_referentienummer(metadata_url, retries=3, backoff_factor=0.3):
                 referentienummer_element = root.find('.//metadata[@name="OVERHEIDop.referentienummer"]')
                 if referentienummer_element is not None:
                     return referentienummer_element.attrib.get('content')
+                else:
+                    print(f"No referentienummer found in metadata for URL: {metadata_url}")
+            else:
+                print(f"Failed to fetch metadata from {metadata_url}, status code: {response.status_code}")
         except Exception as e:
             print(f"Error fetching referentienummer from {metadata_url}: {e}")
+            time.sleep(backoff_factor * (2 ** attempt))  # Exponential backoff
+        attempt += 1
+    return None
+
+
+def fetch_metadata_url(source_xml_url, retries=3, backoff_factor=0.3):
+    attempt = 0
+    while attempt < retries:
+        try:
+            response = requests.get(source_xml_url)
+            if response.status_code == 200:
+                root = ET.fromstring(response.content)
+                metadata_url_element = root.find('.//gzd:itemUrl[@manifestation="metadata"]', NAMESPACES)
+                if metadata_url_element is not None:
+                    print(f"Found metadata URL: {metadata_url_element.text} for source XML URL: {source_xml_url}")
+                    return metadata_url_element.text
+                else:
+                    print(f"No metadata URL found in source XML for URL: {source_xml_url}")
+            else:
+                print(f"Failed to fetch source XML from {source_xml_url}, status code: {response.status_code}")
+        except Exception as e:
+            print(f"Error fetching metadata URL from {source_xml_url}: {e}")
             time.sleep(backoff_factor * (2 ** attempt))  # Exponential backoff
         attempt += 1
     return None
@@ -184,7 +206,7 @@ def write_to_postgis(gdf, layer_name, db_url, schema='geo'):
 
 
 def main():
-    start_date = datetime.strptime('2024-01-01', '%Y-%m-%d')
+    start_date = start_datum
     end_date = datetime.now()
 
     records = fetch_records(start_date, end_date)
@@ -210,6 +232,17 @@ def main():
     gdf_points_within = gdf_points[gdf_points.within(geometry_bounds)]
     gdf_lines_within = gdf_lines[gdf_lines.within(geometry_bounds)]
     gdf_polygons_within = gdf_polygons[gdf_polygons.within(geometry_bounds)]
+
+    # Fetch metadata URL and referentienummer for filtered geometries
+    start_time = time.time()
+    for gdf in [gdf_points_within, gdf_lines_within, gdf_polygons_within]:
+        gdf['metadata_url'] = gdf['source_xml'].apply(lambda url: fetch_metadata_url(url) if url else None)
+        gdf['referentienummer'] = gdf['metadata_url'].apply(lambda url: fetch_referentienummer(url) if url else None)
+    elapsed_time = time.time() - start_time
+    #total_records = sum(len(gdf) for gdf in [gdf_points_within, gdf_lines_within, gdf_polygons_within])
+    #avg_time_per_record = elapsed_time / total_records if total_records > 0 else 0
+    print(f"Elapsed time for fetching referentienummers: {elapsed_time:.2f} seconds")
+    #print(f"Average time per record: {avg_time_per_record:.2f} seconds")
 
     # Write to PostGIS
     write_to_postgis(gdf_points_within, layer_point, db_url, schema)

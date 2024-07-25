@@ -9,6 +9,7 @@ from shapely import wkt
 from sqlalchemy import create_engine, text
 from geoalchemy2 import Geometry, WKTElement
 import configparser
+import os
 
 # Read configuration from config.ini
 config = configparser.ConfigParser()
@@ -138,6 +139,27 @@ def extract_data(record):
     return record_data
 
 
+def fetch_metadata_url(source_xml_url, retries=3, backoff_factor=0.3):
+    attempt = 0
+    while attempt < retries:
+        try:
+            response = requests.get(source_xml_url)
+            if response.status_code == 200:
+                root = ET.fromstring(response.content)
+                metadata_url_element = root.find('.//gzd:itemUrl[@manifestation="metadata"]', NAMESPACES)
+                if metadata_url_element is not None:
+                    return metadata_url_element.text
+                else:
+                    print(f"No metadata URL found in source XML for URL: {source_xml_url}")
+            else:
+                print(f"Failed to fetch source XML from {source_xml_url}, status code: {response.status_code}")
+        except Exception as e:
+            print(f"Error fetching metadata URL from {source_xml_url}: {e}")
+            time.sleep(backoff_factor * (2 ** attempt))  # Exponential backoff
+        attempt += 1
+    return None
+
+
 def fetch_referentienummer(metadata_url, retries=3, backoff_factor=0.3):
     attempt = 0
     while attempt < retries:
@@ -148,34 +170,10 @@ def fetch_referentienummer(metadata_url, retries=3, backoff_factor=0.3):
                 referentienummer_element = root.find('.//metadata[@name="OVERHEIDop.referentienummer"]')
                 if referentienummer_element is not None:
                     return referentienummer_element.attrib.get('content')
-                else:
-                    print(f"No referentienummer found in metadata for URL: {metadata_url}")
             else:
                 print(f"Failed to fetch metadata from {metadata_url}, status code: {response.status_code}")
         except Exception as e:
             print(f"Error fetching referentienummer from {metadata_url}: {e}")
-            time.sleep(backoff_factor * (2 ** attempt))  # Exponential backoff
-        attempt += 1
-    return None
-
-
-def fetch_metadata_url(source_xml_url, retries=3, backoff_factor=0.3):
-    attempt = 0
-    while attempt < retries:
-        try:
-            response = requests.get(source_xml_url)
-            if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                metadata_url_element = root.find('.//gzd:itemUrl[@manifestation="metadata"]', NAMESPACES)
-                if metadata_url_element is not None:
-                    print(f"Found metadata URL: {metadata_url_element.text} for source XML URL: {source_xml_url}")
-                    return metadata_url_element.text
-                else:
-                    print(f"No metadata URL found in source XML for URL: {source_xml_url}")
-            else:
-                print(f"Failed to fetch source XML from {source_xml_url}, status code: {response.status_code}")
-        except Exception as e:
-            print(f"Error fetching metadata URL from {source_xml_url}: {e}")
             time.sleep(backoff_factor * (2 ** attempt))  # Exponential backoff
         attempt += 1
     return None
@@ -234,15 +232,23 @@ def main():
     gdf_polygons_within = gdf_polygons[gdf_polygons.within(geometry_bounds)]
 
     # Fetch metadata URL and referentienummer for filtered geometries
-    start_time = time.time()
+    unique_source_xmls = gdf_points_within['source_xml'].dropna().unique().tolist() + \
+                         gdf_lines_within['source_xml'].dropna().unique().tolist() + \
+                         gdf_polygons_within['source_xml'].dropna().unique().tolist()
+    unique_source_xmls = list(set(unique_source_xmls))  # Get unique URLs
+
+    metadata_dict = {}
+    referentienummer_dict = {}
+
+    for source_xml in unique_source_xmls:
+        metadata_url = fetch_metadata_url(source_xml)
+        if metadata_url:
+            metadata_dict[source_xml] = metadata_url
+            referentienummer_dict[source_xml] = fetch_referentienummer(metadata_url)
+
     for gdf in [gdf_points_within, gdf_lines_within, gdf_polygons_within]:
-        gdf['metadata_url'] = gdf['source_xml'].apply(lambda url: fetch_metadata_url(url) if url else None)
-        gdf['referentienummer'] = gdf['metadata_url'].apply(lambda url: fetch_referentienummer(url) if url else None)
-    elapsed_time = time.time() - start_time
-    #total_records = sum(len(gdf) for gdf in [gdf_points_within, gdf_lines_within, gdf_polygons_within])
-    #avg_time_per_record = elapsed_time / total_records if total_records > 0 else 0
-    print(f"Elapsed time for fetching referentienummers: {elapsed_time:.2f} seconds")
-    #print(f"Average time per record: {avg_time_per_record:.2f} seconds")
+        gdf.loc[:, 'metadata_url'] = gdf['source_xml'].map(metadata_dict)
+        gdf.loc[:, 'referentienummer'] = gdf['metadata_url'].map(referentienummer_dict)
 
     # Write to PostGIS
     write_to_postgis(gdf_points_within, layer_point, db_url, schema)
